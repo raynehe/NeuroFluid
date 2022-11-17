@@ -6,3 +6,6 @@ random*.ipynb
 *.pdf
 *_nerf.py
 _configs
+
+abandon/
+.vscode/
