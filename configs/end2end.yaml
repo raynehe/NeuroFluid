@@ -1,15 +1,15 @@
 TRAIN:
   seed: 10
   partial_load: False
-  pretained_renderer: 'exps/watercube/warmup/models/99999.pt'
-  pretrained_transition_model: '/data/syguan/fluid_simulation/release/ckpts/trans/transv3_694999.pt' # '/data/syguan/fluid_simulation/release/ckpts/trans/dlf.pt'
+  pretained_renderer: 'exps/watercube/scale-1.0/warmup/models/99999.pt'
+  pretrained_transition_model: '/home/rayne/datasets/fluid_simulation/watercube.pt' # '/data/syguan/fluid_simulation/release/ckpts/trans/dlf.pt'
   seperate_render_transition: True # seperate set learning scheduler for renderer and transition model
   LR:
     trans_lr: 1.0e-5
     renderer_lr: 3.0e-4
     use_scheduler: True
     # decay_eopchs: 10000
-  half_res: False
+  half_res: Falsesss
   epochs: 20000
   precrop_iters: 500
   save_interval: 500
