@@ -228,6 +228,8 @@ class RenderNet(nn.Module):
         # embedding attributes
         pos_like_feats_0, dirs_like_feats_0, num_nn_0 = self.embedding_local_geometry(dists_0, indices_0, neighbors_0, radius_0, ray_particles_0, rays, ro)
         input_feats_0 = torch.cat(pos_like_feats_0+dirs_like_feats_0, dim=1)
+
+        '''算完了ex和ed'''
         # predict rgbsigma
         rgbsigma_0 = self.nerf_coarse(input_feats_0)
         mask_0 = torch.all(dists_0!=0, dim=-1, keepdim=True).float()
@@ -242,6 +244,8 @@ class RenderNet(nn.Module):
         results['opacity0'] = weights_0.sum(1)
         results['num_nn_0'] = num_nn_0
         results['mask_0'] = mask_0.sum(1)
+        '''用MLP(nerf_coarse函数)输出了density(和color'''
+
         
         # ---------------
         # fine render
