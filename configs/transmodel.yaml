@@ -1,10 +1,10 @@
 TRAIN:
-  pretrained: /home/rayne/datasets/fluid_simulation/watercube.pt
+  pretrained: /data/syguan/fluid_simulation/release/ckpts/trans/dlf.pt
   seed: 10
   datapath: 
-    train: /home/rayne/datasets/fluid_simulation/data_release/watercube
+    train: /data/syguan/fluid_simulation/release/data_release/watercube
     train_datatype: blender
-    eval: /home/rayne/datasets/fluid_simulation/data_release/watercube
+    eval: /data/syguan/fluid_simulation/release/data_release/watercube
     eval_datatype: blender
   start_index: 0
   end_index: 50
@@ -21,7 +21,7 @@ TRAIN:
 
 TEST:
   seed: 10
-  datapath: /home/rayne/datasets/fluid_simulation/data_release/watercube
+  datapath: /data/syguan/fluid_simulation/release/data_release/watercube
   datatype: blender
   start_index: 0
   end_index: 60

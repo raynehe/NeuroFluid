@@ -6,9 +6,3 @@ random*.ipynb
 *.pdf
 *_nerf.py
 _configs
-
-# add
-.vscode/
-SPlisHSPlasH-2.4.0/
-*.tar.gz
-pytorch3d/

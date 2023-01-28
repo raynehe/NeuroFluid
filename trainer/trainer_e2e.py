@@ -181,7 +181,6 @@ class Trainer(BaseTrainer):
                 global_step += 1
                         
                 # evaluation
-                print("global_step:",global_step,", save_interval:",self.save_interval)
                 if (global_step+1) % self.save_interval == 0:
                     self.eval(global_step)
                     self.save_checkpoint(global_step)
@@ -317,7 +316,6 @@ class Trainer(BaseTrainer):
             dist_pred2gt_all = []
             fluid_error = FluidErrors()
             for data_idx in range(self.test_dataset_length):
-                print("test data_idx:",data_idx," ,test_dataset_length:" ,self.test_dataset_length)
                 data = self.test_dataset[data_idx]
                 data = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v for k,v in data.items()}
                 

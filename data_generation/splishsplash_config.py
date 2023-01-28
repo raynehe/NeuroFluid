@@ -1,6 +1,6 @@
 """Config file that stores the paths to the SPlisHSPlasH binaries """
 # Set this variable to the path of the DynamicBoundarySimulator binary
-SIMULATOR_BIN = '/home/rayne/code/NeuroFluid/SPlisHSPlasH-2.4.0/bin/DynamicBoundarySimulator'
+SIMULATOR_BIN = '/home/syguan/fluid_env/tmp/SPlisHSPlasH-2.4.0/bin/DynamicBoundarySimulator'
 
 if SIMULATOR_BIN is None:
     raise ValueError(
