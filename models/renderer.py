@@ -369,3 +369,14 @@ class RenderNet(nn.Module):
         return results
         
         
+    def eikonal_loss(self, num_pixels, cam_loc, ray_dirs, z_samples_eik, physical_particles, ro, rays, batch_size):
+        # Sample points for the eikonal loss
+        n_eik_points = batch_size * num_pixels
+        eikonal_points = torch.empty(n_eik_points, 3).uniform_(-self.scene_bounding_sphere, self.scene_bounding_sphere).cuda()
+
+        # add some of the near surface points
+        eik_near_points = (cam_loc.unsqueeze(1) + z_samples_eik.unsqueeze(2) * ray_dirs.unsqueeze(1)).reshape(-1, 3)
+        eikonal_points = torch.cat([eikonal_points, eik_near_points], 0)
+
+        grad_theta = self.implicit_network.gradient(eikonal_points)
+        return grad_theta

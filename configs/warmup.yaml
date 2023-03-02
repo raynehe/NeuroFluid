@@ -19,7 +19,7 @@ TEST:
   imgW: 400
   imgH: 400
   scale: 1.0
-  data_path: '/data/syguan/fluid_simulation/release/data_release/watercube/honeycone/view_1/train/particles'
+  data_path: '/home/rayne/datasets/fluid_simulation/data_release/watercube/honeycone/view_1/train/particles'
   start_index: 0
   end_index: 50
   near: 9.0
@@ -44,3 +44,36 @@ RENDERER:
     smoothed_dir: True
     exclude_ray: True
     same_smooth_factor: False
+  
+  ### volsdf renderer params ###
+  feature_vector_size: 256
+  scene_bounding_sphere: 3.0
+  implicit_network:
+      d_in: 3
+      d_out: 1
+      dims: [ 256, 256, 256, 256, 256, 256, 256, 256 ]
+      geometric_init: True
+      bias: 0.6
+      skip_in: [4]
+      weight_norm: True
+      multires: 6
+      sphere_scale: 20.0
+  rendering_network:
+      mode: idr
+      d_in: 9
+      d_out: 3
+      dims: [ 256, 256, 256, 256]
+      weight_norm: True
+      multires_view: 4
+  density:
+      params_init:
+          beta: 0.1
+      beta_min: 0.0001
+  ray_sampler:
+      near: 0.0
+      N_samples: 64
+      N_samples_eval: 128
+      N_samples_extra: 32
+      eps: 0.1
+      beta_iters: 10
+      max_total_iters: 5
