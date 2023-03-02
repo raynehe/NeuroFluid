@@ -30,10 +30,11 @@ class Embedding(nn.Module):
         Outputs:
             out: (B, self.out_channels)
         """
-        out = [x]
+        out = [x] # out[0] 可能比较大?
         for freq in self.freq_bands:
             for func in self.funcs:
-                out += [func(freq*x)]
+                # func(freq*x) # [65536, 3] 肯定是在[-1,1]之间的
+                out += [func(freq*x)] # [[65536, 3], [65536, 3], ...]
 
         return torch.cat(out, -1)
 

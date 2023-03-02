@@ -180,14 +180,15 @@ class BaseTrainer():
             coordinates of sampled pixels
         """
         if global_step > self.options.TRAIN.precrop_iters:
-            coords = torch.stack(torch.meshgrid(torch.linspace(0, H-1, H), torch.linspace(0, W-1, W)), -1)  # (H, W, 2)
+            coords = torch.stack(torch.meshgrid(torch.linspace(0, H-1, H), torch.linspace(0, W-1, W),indexing='ij'), -1)  # (H, W, 2)
         else:
             dH = int(H//2 * 0.5)
             dW = int(W//2 * 0.5)
             coords = torch.stack(
                                 torch.meshgrid(
                                 torch.linspace(H//2 - dH, H//2 + dH - 1, 2*dH), 
-                                torch.linspace(W//2 - dW, W//2 + dW - 1, 2*dW)
+                                torch.linspace(W//2 - dW, W//2 + dW - 1, 2*dW),
+                                indexing='ij'
                             ), -1)
         coords = torch.reshape(coords, [-1,2])  # (H * W, 2)
         return coords
@@ -277,6 +278,7 @@ class BaseTrainer():
             rendered results 
         """
         pred_rgbs_0, pred_rgbs_1 = [], []
+        grad_theta = []
         num_nn_0, num_nn_1 = [], []
         mask_0, mask_1 = [], []
         for ray_idx in range(0, N_ray, self.options.RENDERER.ray.ray_chunk):
@@ -285,9 +287,12 @@ class BaseTrainer():
                                     ro,
                                     rays[ray_idx:ray_idx+self.options.RENDERER.ray.ray_chunk],
                                     focal_length,
-                                    cw
+                                    cw,
+                                    iseval = iseval
                                     )
             pred_rgbs_0 += [results_i['rgb0']]
+            if 'grad_theta' in results_i:
+                grad_theta += [results_i['grad_theta']]
             num_nn_0 += [results_i['num_nn_0'].view(-1)]
             if iseval:
                 mask_0 += [results_i['mask_0']]
@@ -298,6 +303,8 @@ class BaseTrainer():
                     mask_1 += [results_i['mask_1']]
         ret = {}
         ret['pred_rgbs_0'] = torch.cat(pred_rgbs_0, dim=0)
+        if len(grad_theta) > 0:
+            ret['grad_theta'] = torch.cat(grad_theta, dim=0)
         ret['num_nn_0'] = torch.cat(num_nn_0, dim=0)
         if iseval:
             ret['mask_0'] = torch.cat(mask_0, dim=0)

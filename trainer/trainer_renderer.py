@@ -15,6 +15,7 @@ from .basetrainer import BaseTrainer
 from models.renderer import RenderNet
 from datasets.dataset import BlenderDataset
 from utils.lr_schedulers import ExponentialLR
+from torch.nn.utils import clip_grad_norm_
 
 img2mse = lambda x, y : torch.mean((x - y) ** 2)
 mse2psnr = lambda x : -10. * torch.log(x) / torch.log(torch.Tensor([10.]).cuda())
@@ -94,10 +95,36 @@ class Trainer(BaseTrainer):
     def update_step(self,loss):
         self.optimizer.zero_grad()
         loss.backward()
+        # # clip the grad
+        # clip_grad_norm_(self.renderer.parameters(), max_norm=1, norm_type=2)
         self.optimizer.step()
+        # print("=============更新之后===========")
+        # names = [
+        #     # 'nerf_coarse.xyz_encoding_1.0.weight',
+        #     # 'density.beta', 
+        #     # 'implicit_network.lin0.bias', 
+        #     # 'implicit_network.lin8.bias',
+        #     'implicit_network.lin8.weight_g',
+        #     # 'implicit_network.lin8.weight_v',
+        #     'rendering_network.lin0.bias'
+        #     ]
+        # for name, parms in self.renderer.named_parameters():
+        #     # if name in names:	
+        #         print('-->name:', name)
+        #         print('-->para:', parms)
+        #         # print('-->grad_requirs:',parms.requires_grad)
+        #         print('-->grad_value:',parms.grad)
+        #         # print('-->is_leaf:',parms.is_leaf)
+        #         # print('grad-norm:',  torch.norm(parms.grad))
+        #         print("===")
         if self.options.TRAIN.LR.use_scheduler:
             self.lr_scheduler.step()
+        print('learning rate:', self.optimizer.param_groups[0]['lr'])
+        print('loss:', loss.item())
     
+    def get_eikonal_loss(self, grad_theta):
+        eikonal_loss = ((grad_theta.norm(2, dim=1) - 1) ** 2).mean().to(self.device)
+        return eikonal_loss
         
     def train_step(self, data, view_num, H, W, step_idx):
         # -------
@@ -131,15 +158,22 @@ class Trainer(BaseTrainer):
             else:
                 rgbloss = rgbloss_0
             total_loss = total_loss+rgbloss
+            # calculate eikonal loss
+            if 'grad_theta' in render_ret:
+                eikonal_loss = self.get_eikonal_loss(render_ret['grad_theta'])
+                total_loss = total_loss+self.options.TRAIN.eikonal_weight*eikonal_loss
                     
             # log
             if (step_idx+1) % self.options.TRAIN.log_interval == 0:
                 self.summary_writer.add_scalar(f'{view_name}/rgbloss_0', rgbloss_0.item(), step_idx)
+                self.summary_writer.add_scalar(f'{view_name}/eikonal_loss', eikonal_loss.item(), step_idx)
                 self.summary_writer.add_histogram(f'{view_name}/num_neighbors_0', render_ret['num_nn_0'], step_idx)
                 if N_importance>0:
                     self.summary_writer.add_scalar(f'{view_name}/rgbloss_1', rgbloss_1.item(), step_idx)
                     self.summary_writer.add_histogram(f'{view_name}/num_neighbors_1', render_ret['num_nn_1'], step_idx)
-                self.summary_writer.add_scalar(f'{view_name}/rgbloss', rgbloss.item(), step_idx)
+                # self.summary_writer.add_scalar(f'{view_name}/rgbloss', rgbloss.item(), step_idx)
+                self.summary_writer.add_scalar(f'{view_name}/total_loss', total_loss.item(), step_idx)
+            torch.cuda.empty_cache()
         return total_loss
     
         

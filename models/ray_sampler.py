@@ -44,13 +44,13 @@ class UniformSampler(RaySampler):
 
 
 class ErrorBoundSampler(RaySampler):
-    def __init__(self, scene_bounding_sphere, near, N_samples, N_samples_eval, N_samples_extra,
+    def __init__(self, scene_bounding_sphere, near, far, N_samples, N_samples_eval, N_samples_extra,
                  eps, beta_iters, max_total_iters,
                  inverse_sphere_bg=False, N_samples_inverse_sphere=0, add_tiny=0.0):
-        super().__init__(near, 2.0 * scene_bounding_sphere)
+        super().__init__(near, far)
         self.N_samples = N_samples
         self.N_samples_eval = N_samples_eval
-        self.uniform_sampler = UniformSampler(scene_bounding_sphere, near, N_samples_eval, take_sphere_intersection=inverse_sphere_bg)
+        self.uniform_sampler = UniformSampler(scene_bounding_sphere, near, N_samples_eval, take_sphere_intersection=inverse_sphere_bg, far=far)
 
         self.N_samples_extra = N_samples_extra
 
@@ -64,7 +64,7 @@ class ErrorBoundSampler(RaySampler):
         if inverse_sphere_bg:
             self.inverse_sphere_sampler = UniformSampler(1.0, 0.0, N_samples_inverse_sphere, False, far=1.0)
 
-    def get_z_vals(self, ray_dirs, cam_loc, model):
+    def get_z_vals(self, ray_dirs, cam_loc, physical_particles, rays, ro, model):
         beta0 = model.density.get_beta().detach()
 
         # Start with uniform sampling
@@ -85,7 +85,12 @@ class ErrorBoundSampler(RaySampler):
 
             # Calculating the SDF only for the new sampled points
             with torch.no_grad():
-                samples_sdf = model.implicit_network.get_sdf_vals(points_flat)
+                # samples_sdf = model.implicit_network.get_sdf_vals(points_flat)
+
+                z_dists, z_indices, z_neighbors, z_radius = model.search(points, physical_particles, model.fix_radius)
+                z_pos_like_feats, _ , _ = model.embedding_local_geometry(z_dists, z_indices, z_neighbors, z_radius, points, rays, ro)
+                z_pos_related_input = torch.cat(z_pos_like_feats, dim=1)
+                samples_sdf = model.implicit_network.get_sdf_vals(z_pos_related_input)
             if samples_idx is not None:
                 sdf_merge = torch.cat([sdf.reshape(-1, z_vals.shape[1] - samples.shape[1]),
                                        samples_sdf.reshape(-1, samples.shape[1])], -1)
@@ -147,6 +152,7 @@ class ErrorBoundSampler(RaySampler):
                 bound_opacity = (torch.clamp(torch.exp(error_integral),max=1.e6) - 1.0) * transmittance[:,:-1]
 
                 pdf = bound_opacity + self.add_tiny
+                pdf = pdf + 1e-7  # prevent nans
                 pdf = pdf / torch.sum(pdf, -1, keepdim=True)
                 cdf = torch.cumsum(pdf, -1)
                 cdf = torch.cat([torch.zeros_like(cdf[..., :1]), cdf], -1)

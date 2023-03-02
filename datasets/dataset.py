@@ -11,6 +11,8 @@ import joblib
 import numpy as np
 import os.path as osp
 from PIL import Image
+import cv2
+from utils import rend_util
 
 import torch
 from torch.utils.data import Dataset
@@ -58,6 +60,58 @@ class BlenderDataset(Dataset):
         self.particles_vels_mv = np.stack(self.particles_vels_mv, 0)
         # import ipdb;ipdb.set_trace()
         
+    def get_center_point(self, pose):
+        # pose:4*4
+        A = np.zeros((3, 4))
+        b = np.zeros((3, 1))
+        camera_centers=np.zeros((3, 1))
+
+        P0 = pose[:3, :]
+
+        K = cv2.decomposeProjectionMatrix(P0)[0]
+        R = cv2.decomposeProjectionMatrix(P0)[1]
+        c = cv2.decomposeProjectionMatrix(P0)[2]
+        c = c / c[3]
+        camera_centers[:,0]=c[:3].flatten()
+
+        v = np.linalg.inv(K) @ np.array([800, 600, 1])
+        v = v / np.linalg.norm(v)
+
+        v=R[2,:]
+        A[0:3, :3] = np.eye(3)
+        A[0:3,3] = -v
+        b[0:3] = c[:3]
+
+        soll= np.linalg.pinv(A) @ b
+
+        return soll,camera_centers
+
+    def normalize_cameras(self, pose):
+        # pose:4*4
+        soll, camera_centers = self.get_center_point(pose)
+
+        center = soll[:3].flatten()
+
+        max_radius = np.linalg.norm((center[:, np.newaxis] - camera_centers), axis=0).max() * 1.1
+
+        normalization = np.eye(4).astype(np.float32)
+
+        normalization[0, 3] = center[0]
+        normalization[1, 3] = center[1]
+        normalization[2, 3] = center[2]
+
+        normalization[0, 0] = max_radius / 3.0
+        normalization[1, 1] = max_radius / 3.0
+        normalization[2, 2] = max_radius / 3.0
+
+        scale_mat = normalization.astype(np.float32)
+        world_mat = pose.astype(np.float32)
+
+        P = world_mat @ scale_mat
+        P = P[:3, :4]
+        _, pose = rend_util.load_K_Rt_from_P(None, P)
+        return torch.from_numpy(pose).float()
+
 
     def _read_meta(self, root_dir):
         """
@@ -93,6 +147,9 @@ class BlenderDataset(Dataset):
                 particle_vels.append(particle_vel)
             # get orignal point and directrion
             pose = np.array(frame['transform_matrix'])[:3, :4]
+            # pose = np.array(frame['transform_matrix'])
+            # pose = self.normalize_cameras(pose)
+            # pose = pose[:3, :4]
             poses.append(pose)
             c2w = torch.FloatTensor(pose)
             all_cw.append(pose)

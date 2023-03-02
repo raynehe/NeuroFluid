@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from models.embedder import *
+import numpy as np
 
 class RenderingNetwork(nn.Module):
     def __init__(
@@ -12,6 +13,8 @@ class RenderingNetwork(nn.Module):
             dims,
             weight_norm=True,
             multires_view=0,
+            bias=1.0,
+            geometric_init=True
     ):
         super().__init__()
 
@@ -30,6 +33,23 @@ class RenderingNetwork(nn.Module):
             out_dim = dims[l + 1]
             lin = nn.Linear(dims[l], out_dim)
 
+            if geometric_init:
+                if l == self.num_layers - 2:
+                    # torch.nn.init.normal_(lin.weight, mean=np.sqrt(np.pi) / np.sqrt(dims[l]), std=0.0001)
+                    torch.nn.init.normal_(lin.weight, mean=0.0, std=0.0001)
+                    torch.nn.init.constant_(lin.bias, -bias)
+                elif multires_view > 0 and l == 0:
+                    torch.nn.init.constant_(lin.bias, 0.0)
+                    torch.nn.init.constant_(lin.weight[:, 3:], 0.0)
+                    torch.nn.init.normal_(lin.weight[:, :3], 0.0, np.sqrt(2) / np.sqrt(out_dim))
+                elif multires_view > 0 and l in self.skip_in:
+                    torch.nn.init.constant_(lin.bias, 0.0)
+                    torch.nn.init.normal_(lin.weight, 0.0, np.sqrt(2) / np.sqrt(out_dim))
+                    torch.nn.init.constant_(lin.weight[:, -(dims[0] - 3):], 0.0)
+                else:
+                    torch.nn.init.constant_(lin.bias, 0.0)
+                    torch.nn.init.normal_(lin.weight, 0.0, np.sqrt(2) / np.sqrt(out_dim))
+
             if weight_norm:
                 lin = nn.utils.weight_norm(lin)
 
@@ -37,6 +57,7 @@ class RenderingNetwork(nn.Module):
 
         self.relu = nn.ReLU()
         self.sigmoid = torch.nn.Sigmoid()
+        self.leakyrelu = nn.LeakyReLU(negative_slope=1e-2)
 
     def forward(self, points, normals, view_dirs, feature_vectors):
         if self.embedview_fn is not None:
@@ -55,7 +76,7 @@ class RenderingNetwork(nn.Module):
             x = lin(x)
 
             if l < self.num_layers - 2:
-                x = self.relu(x)
+                x = self.leakyrelu(x)
 
         x = self.sigmoid(x)
         return x

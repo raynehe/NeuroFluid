@@ -6,3 +6,12 @@ random*.ipynb
 *.pdf
 *_nerf.py
 _configs
+
+# add
+.vscode*
+SPlisHSPlasH-2.4.0*
+pytorch3d*
+Open3D-ML*
+*.tar.gz
+trygenerate*
+figs*

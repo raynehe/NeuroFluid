@@ -43,7 +43,8 @@ class ImplicitNetwork(nn.Module):
 
             if geometric_init:
                 if l == self.num_layers - 2:
-                    torch.nn.init.normal_(lin.weight, mean=np.sqrt(np.pi) / np.sqrt(dims[l]), std=0.0001)
+                    # torch.nn.init.normal_(lin.weight, mean=np.sqrt(np.pi) / np.sqrt(dims[l]), std=0.0001)
+                    torch.nn.init.normal_(lin.weight, mean=0.0, std=0.0001)
                     torch.nn.init.constant_(lin.bias, -bias)
                 elif multires > 0 and l == 0:
                     torch.nn.init.constant_(lin.bias, 0.0)
@@ -63,6 +64,10 @@ class ImplicitNetwork(nn.Module):
             setattr(self, "lin" + str(l), lin)
 
         self.softplus = nn.Softplus(beta=100)
+        self.leakyrelu = nn.LeakyReLU(negative_slope=1e-2)
+        # self.BN = nn.BatchNorm1d(256)
+        # self.BN_skip = nn.BatchNorm1d(256-198)
+        # self.BN_final = nn.BatchNorm1d(257)
 
     def forward(self, input):
         if self.embed_fn is not None:
@@ -79,12 +84,19 @@ class ImplicitNetwork(nn.Module):
             x = lin(x)
 
             if l < self.num_layers - 2:
-                x = self.softplus(x)
+                x = self.leakyrelu(x)
+                # if (l+1) in self.skip_in:
+                #     x = self.BN_skip(x)
+                # else:
+                #     x = self.BN(x)
+        # x = self.BN_final(x)
 
         return x
 
-    def gradient(self, x):
+    def gradient(self, x, iseval=False):
         x.requires_grad_(True)
+        if (iseval):
+            torch.set_grad_enabled(True)
         y = self.forward(x)[:,:1]
         d_output = torch.ones_like(y, requires_grad=False, device=y.device)
         gradients = torch.autograd.grad(
@@ -94,10 +106,15 @@ class ImplicitNetwork(nn.Module):
             create_graph=True,
             retain_graph=True,
             only_inputs=True)[0]
+        if (iseval):
+            torch.set_grad_enabled(False)
+            gradients = gradients.detach()
         return gradients
 
-    def get_outputs(self, x):
+    def get_outputs(self, x, iseval=False):
         x.requires_grad_(True)
+        if (iseval):
+            torch.set_grad_enabled(True)
         output = self.forward(x)
         sdf = output[:,:1]
         ''' Clamping the SDF with the scene bounding sphere, so that all rays are eventually occluded '''
@@ -113,6 +130,11 @@ class ImplicitNetwork(nn.Module):
             create_graph=True,
             retain_graph=True,
             only_inputs=True)[0]
+        if (iseval):
+            torch.set_grad_enabled(False)
+            sdf = sdf.detach()
+            feature_vectors = feature_vectors.detach()
+            gradients = gradients.detach()
 
         return sdf, feature_vectors, gradients
 

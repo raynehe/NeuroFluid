@@ -49,6 +49,9 @@ class Evaluator(BaseTrainer):
     
     def resume(self, ckpt_file):
         # resume
+        # self.modelname = osp.basename(ckpt_file).split('/')[-1][:-3]
+        # self.particlepath = osp.join(self.exppath, self.modelname, 'particles')
+        # self.imgpath = osp.join(self.exppath, self.modelname, 'images')
         checkpoint = torch.load(ckpt_file)
         self.renderer.load_state_dict(checkpoint['renderer_state_dict'], strict=True)
         self.transition_model.load_state_dict(checkpoint['transition_model_state_dict'], strict=True)
@@ -89,10 +92,10 @@ class Evaluator(BaseTrainer):
                 if not osp.exists(osp.join(self.particlepath, 'Pred')):
                     os.makedirs(osp.join(self.particlepath, 'Pred'))
                     os.makedirs(osp.join(self.particlepath, 'GT'))
-                particle_name = osp.join(self.particlepath, f'Pred/{data_idx+1}.obj')
+                particle_name = osp.join(self.particlepath, f'Pred/pred{data_idx+1}.obj')
                 with open(particle_name, 'w') as fp:
                     record2obj(pred_pos, fp, color=[255, 0, 0]) # red
-                particle_name = osp.join(self.particlepath, f'GT/{data_idx+1}.obj')
+                particle_name = osp.join(self.particlepath, f'GT/gt{data_idx+1}.obj')
                 with open(particle_name, 'w') as fp:
                     record2obj(pos_t1, fp, color=[3, 168, 158])
                     
@@ -138,17 +141,17 @@ class Evaluator(BaseTrainer):
         pred_image = self.vis_rgbs(pred_rgbs)
         gt_image = self.vis_rgbs(gt_rgbs)
         
-        if not os.path.exists(osp.join(self.imgpath, prefix)):
-            os.makedirs(osp.join(self.imgpath, prefix, 'GT'))
-            os.makedirs(osp.join(self.imgpath, prefix, 'Pred'))
+        if not os.path.exists(osp.join(self.imgpath)):
+            os.makedirs(osp.join(self.imgpath, 'GT'))
+            os.makedirs(osp.join(self.imgpath, 'Pred'))
         
         # save res
         gt_rgb8 = to8b(gt_image.permute(1,2,0).detach().numpy())
-        filename = '{}/{}/GT/{:05d}.png'.format(self.imgpath, prefix, data_idx)
+        filename = '{}/GT/{:05d}.png'.format(self.imgpath, data_idx)
         imageio.imwrite(filename, gt_rgb8)
         
         pred_rgb8 = to8b(pred_image.permute(1,2,0).detach().numpy())
-        filename = '{}/{}/Pred/{:05d}.png'.format(self.imgpath, prefix, data_idx)
+        filename = '{}/Pred/{:05d}.png'.format(self.imgpath, data_idx)
         imageio.imwrite(filename, pred_rgb8)
         
 
