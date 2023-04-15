@@ -1,5 +1,5 @@
 TRAIN:
-  pretrained: /home/rayne/datasets/fluid_simulation/watercube.pt
+  pretrained: /home/rayne/datasets/fluid_simulation/dlf.pt
   seed: 10
   datapath: 
     train: /home/rayne/datasets/fluid_simulation/data_release/watercube

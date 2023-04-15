@@ -127,16 +127,21 @@ class TransModelEvaluation():
                         record2obj(self.strict_clip_particles(gt_pos), fp, color=[3, 168, 158])
                         
             self.fluid_erros.save(osp.join(self.exppath, 'res.json'))
+            if not os.path.exists(osp.join(self.exppath, 'clip')):
+                os.makedirs(osp.join(self.exppath, 'clip'))
             self.cliped_fluid_erros.save(osp.join(self.exppath, 'clip', 'res.json'))
+        dist_pred2gt_all = [float('{:.2f}'.format(i)) for i in dist_pred2gt_all]
         print('\n----------------- trained 50 steps ------------------------')
         print('Pred2GT:', np.mean(dist_pred2gt_all[0:49]))
         print('Pred2GT-10:', np.mean(dist_pred2gt_all[:10]))
         print('Pred2GT-end:', dist_pred2gt_all[48])
+        print('Pred2GT:', dist_pred2gt_all[0:49])
         
         print('\n----------------- rollout 10 steps ------------------------')
         print('Pred2GT:', np.mean(dist_pred2gt_all[-10:]))
         print('Pred2GT-5:', np.mean(dist_pred2gt_all[-5]))
         print('Pred2GT-end:', dist_pred2gt_all[-1])
+        print('Pred2GT:', dist_pred2gt_all[-10:])
         # save
         joblib.dump({'pred2gt': dist_pred2gt_all, 'cham_dist_all': cham_dist_all}, os.path.join(self.exppath, 'res.pt'))
         

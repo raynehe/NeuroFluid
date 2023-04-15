@@ -13,7 +13,7 @@ mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release -DUSE_PYTHON_BINDINGS=On ..
 make -j 8
 ```
-- Step 3: set the path of DynamicBoundarySimulator (pathto/SPlisHSPlasH-2.4.0/bin/DynamicBoundarySimulator) to `SIMULATOR_BIN` in splishsplash_config.py.
+- Step 3: set the path of  (pathto/SPlisHSPlasH-2.4.0/bin/DynamicBoundarySimulator) to `SIMULATOR_BIN` in splishsplash_config.py.
 
 ### Install pyopenvdb
 We follow [this repo](https://github.com/theNewFlesh/docker_pyopenvdb) to install pyopenvdb.

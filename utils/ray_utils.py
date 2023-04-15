@@ -1,6 +1,7 @@
 import torch
 from kornia import create_meshgrid
 from torch.functional import norm
+import numpy as np
 
 def get_dist_particle2ray(p, ray_o, ray_direction):
     """

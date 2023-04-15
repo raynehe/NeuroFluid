@@ -4,6 +4,7 @@ TRAIN:
   partial_load: False
   N_iters: 100000
   precrop_iters: 500
+  eikonal_weight: 0.2
   LR:
     lr: 5.0e-4
     use_scheduler: True
@@ -13,13 +14,15 @@ TRAIN:
   scale: 1.0
   save_interval: 500
   log_interval: 10
+  # save_interval: 10 # for debugging
+  # log_interval: 5
 
 TEST:
   camera_angle_x: 0.323
   imgW: 400
   imgH: 400
   scale: 1.0
-  data_path: '/home/rayne/datasets/fluid_simulation/data_release/watercube/honeycone/view_1/train/particles'
+  data_path: '/home/rayne/datasets/fluid_simulation/data_release/watercube/view_5/test/particles'
   start_index: 0
   end_index: 50
   near: 9.0
@@ -29,8 +32,9 @@ TEST:
 RENDERER:
   use_mask: True
   ray:
-    ray_chunk: 1024
-    N_importance: 128  # num of fine sample point
+    ray_chunk: 512
+    # N_importance: 128  # num of fine sample point
+    N_importance: 0 # for volsdf sampling
     N_samples: 64    # num of coarse sample point
   NN_search:
     fix_radius: True
@@ -44,3 +48,39 @@ RENDERER:
     smoothed_dir: True
     exclude_ray: True
     same_smooth_factor: False
+  
+  ### volsdf renderer params ###
+  white_bkgd: true
+  bg_color: [1.0, 1.0, 1.0]
+  feature_vector_size: 256
+  scene_bounding_sphere: 10.76
+  implicit_network:
+      d_in: 198
+      d_out: 1
+      dims: [ 256, 256, 256, 256, 256, 256, 256, 256 ]
+      geometric_init: True
+      bias: 0.6
+      skip_in: [4]
+      weight_norm: True
+      multires: 0
+      sphere_scale: 20.0
+  rendering_network:
+      mode: idr
+      d_in: 450
+      d_out: 3
+      dims: [ 256, 256, 256, 256]
+      weight_norm: True
+      multires_view: 0
+  density:
+      params_init:
+          beta: 0.1
+      beta_min: 0.0001
+  ray_sampler:
+      near: 9.0
+      far: 13.0
+      N_samples: 64
+      N_samples_eval: 128
+      N_samples_extra: 32
+      eps: 0.1
+      beta_iters: 10
+      max_total_iters: 5

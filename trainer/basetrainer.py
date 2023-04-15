@@ -12,6 +12,10 @@ import torch
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 from pytorch3d.loss import chamfer_distance
+import matplotlib
+matplotlib.use('Agg')
+from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 to8b = lambda x : (255*np.clip(x,0,1)).astype(np.uint8)
 class BaseTrainer():
@@ -180,14 +184,15 @@ class BaseTrainer():
             coordinates of sampled pixels
         """
         if global_step > self.options.TRAIN.precrop_iters:
-            coords = torch.stack(torch.meshgrid(torch.linspace(0, H-1, H), torch.linspace(0, W-1, W)), -1)  # (H, W, 2)
+            coords = torch.stack(torch.meshgrid(torch.linspace(0, H-1, H), torch.linspace(0, W-1, W),indexing='ij'), -1)  # (H, W, 2)
         else:
             dH = int(H//2 * 0.5)
             dW = int(W//2 * 0.5)
             coords = torch.stack(
                                 torch.meshgrid(
                                 torch.linspace(H//2 - dH, H//2 + dH - 1, 2*dH), 
-                                torch.linspace(W//2 - dW, W//2 + dW - 1, 2*dW)
+                                torch.linspace(W//2 - dW, W//2 + dW - 1, 2*dW),
+                                indexing='ij'
                             ), -1)
         coords = torch.reshape(coords, [-1,2])  # (H * W, 2)
         return coords
@@ -279,29 +284,42 @@ class BaseTrainer():
         pred_rgbs_0, pred_rgbs_1 = [], []
         num_nn_0, num_nn_1 = [], []
         mask_0, mask_1 = [], []
+        grad_theta = []
+        coarse_sample_points, fine_sample_points = [], []
         for ray_idx in range(0, N_ray, self.options.RENDERER.ray.ray_chunk):
+            a = rays[ray_idx:ray_idx+self.options.RENDERER.ray.ray_chunk][:, 3:6]
+            print('a',round(a.min().item(),2),round(a.max().item(),2))
             # render
             results_i = self.renderer(particle_pos,
                                     ro,
                                     rays[ray_idx:ray_idx+self.options.RENDERER.ray.ray_chunk],
                                     focal_length,
-                                    cw
+                                    cw,
+                                    iseval = iseval
                                     )
             pred_rgbs_0 += [results_i['rgb0']]
+            if 'grad_theta' in results_i:
+                grad_theta += [results_i['grad_theta']]
+            coarse_sample_points += [results_i['coarse_sample_points']]
             num_nn_0 += [results_i['num_nn_0'].view(-1)]
             if iseval:
                 mask_0 += [results_i['mask_0']]
             if self.options.RENDERER.ray.N_importance>0:
+                fine_sample_points += [results_i['fine_sample_points']]
                 pred_rgbs_1 += [results_i['rgb1']]
                 num_nn_1 += [results_i['num_nn_1'].view(-1)]
                 if iseval:
                     mask_1 += [results_i['mask_1']]
         ret = {}
         ret['pred_rgbs_0'] = torch.cat(pred_rgbs_0, dim=0)
+        ret['coarse_sample_points'] = torch.cat(coarse_sample_points, dim=0)
+        if len(grad_theta) > 0:
+            ret['grad_theta'] = torch.cat(grad_theta, dim=0)
         ret['num_nn_0'] = torch.cat(num_nn_0, dim=0)
         if iseval:
             ret['mask_0'] = torch.cat(mask_0, dim=0)
         if self.options.RENDERER.ray.N_importance>0:
+            ret['fine_sample_points'] = torch.cat(fine_sample_points, dim=0)
             ret['pred_rgbs_1'] = torch.cat(pred_rgbs_1, dim=0)
             ret['num_nn_1'] = torch.cat(num_nn_1, dim=0)
             if iseval:
@@ -341,3 +359,24 @@ class BaseTrainer():
         return image
     
 
+    def vis_sample_points(self, gt_pos, sample_points, step, prefix):
+        # gt_pos = gt_pos.cpu()
+        sample_points = sample_points.cpu()
+        fig = plt.figure()
+        ax = Axes3D(fig)
+        ax.scatter(gt_pos[:,0], gt_pos[:,1], gt_pos[:,2], s=1, c='r', marker='.', alpha=0.1)
+        ax.scatter(sample_points[:,0], sample_points[:,1], sample_points[:,2], s=1, c='b', marker='.', alpha=0.03)
+        ax.set_xlim(-2, 2)
+        ax.set_ylim(-2, 2)
+        ax.set_zlim(-2, 2)
+        # plt.show()
+        filename = '{}/{}_{:05d}_samples.png'.format(self.imgpath, prefix, step)
+        plt.savefig(filename)
+        # plt.show(block=False)
+        # plt.close()
+        import cv2
+        sample_img = cv2.imread(filename)
+        sample_img = cv2.cvtColor(sample_img, cv2.COLOR_BGR2RGB)
+        sample_img = np.array(sample_img)
+        self.summary_writer.add_images(prefix.split('_')[1]+'/'+prefix+'_sampling_points', sample_img, step, dataformats='HWC')
+        plt.close()

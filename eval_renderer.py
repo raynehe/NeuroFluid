@@ -143,6 +143,12 @@ class RendererEvaluation(BaseTrainer):
                 render_ret = self.render_image(gt_pos, rays.shape[0], ro, rays, focal_length, cw, iseval=True)
                 pred_rgbs_0 = render_ret['pred_rgbs_0']
                 self.visulization_single_image(pred_rgbs_0, prefix=f'coarse_pred_{name}')
+                import utils.plots as plt
+                plt.get_surface_sliding(path="mesh_eval/result",
+                                        data_idx=data_idx,
+                                        sdf=lambda x: self.renderer.implicit_network.get_outputs(self.renderer.calculate_pe(x,
+                                        gt_pos, rays, ro), iseval = True)[0]
+                                        )
                 if self.options.RENDERER.ray.N_importance>0:
                     pred_rgbs_1 = render_ret['pred_rgbs_1']
                     self.visulization_single_image(pred_rgbs_1, prefix=f'fine_pred_{name}')

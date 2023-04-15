@@ -268,9 +268,7 @@ class RenderNet(nn.Module):
         ro: 3, camera location
         rays: N_rays, 6
         """
-        rays_o, rays_d = rays[:, 0:3], rays[:, 3:6] # (1024, 3) ray_o=ro
-        # multiscene-[9.6846, 0.0000, 4.6888] watercube-[3.7061, 8.9474, 4.6888]
-        # print('ray_dirs',round(rays_d.min().item(),2),round(rays_d.max().item(),2))
+        rays_o, rays_d = rays[:, 0:3], rays[:, 3:6] # (1024, 3) ray_o=ro   watercube-[3.7061, 8.9474, 4.6888]
         num_pixels = self.N_samples
         results = {}
         N_rays = rays.shape[0]
@@ -280,61 +278,36 @@ class RenderNet(nn.Module):
         # coarsely sample
         if self.N_importance > 0: # nf
             z_values_0, ray_particles_0 = coarse_sample_ray(self.near, self.far, rays, self.N_samples, use_disp, perturb)
-            _, z_samples_eik_0 = self.ray_sampler.get_z_vals(rays_d, rays_o, physical_particles, rays, ro, self)
+            _, z_samples_eik_0 = self.ray_sampler.get_z_vals(rays_d, rays_o, self, physical_particles)
         else: # nf+volsdf
-            z_values_0, z_samples_eik_0 = self.ray_sampler.get_z_vals(rays_d, rays_o, physical_particles, rays, ro, self)
+            # ray_dirs, cam_loc, model, physical_particles
+            z_values_0, z_samples_eik_0 = self.ray_sampler.get_z_vals(rays_d, rays_o, self, physical_particles)
             ray_particles_0 = rays_o.unsqueeze(1) + z_values_0.unsqueeze(2) * rays_d.unsqueeze(1)
         ray_particles_plain = ray_particles_0.reshape(-1, 3)
-        # self.plot_3d( physical_particles.cpu().numpy(), ray_particles_plain.cpu().numpy())
         results['coarse_sample_points'] = ray_particles_plain
+        N_samples = z_values_0.shape[1]
+        dirs = rays_d.unsqueeze(1).repeat(1,N_samples,1)
         
-        # ray_dirs_1 = torch.tensor([ [0, 0, 1] for _ in range (rays_d.shape[0]) ]).cuda()
-        # ray_dirs_2 = torch.tensor([ [0, 1, 0] for _ in range (rays_d.shape[0]) ]).cuda()
-        # ray_dirs_3 = torch.tensor([ [1, 0, 0] for _ in range (rays_d.shape[0]) ]).cuda()
-        # points_1 = rays_o.unsqueeze(1) + z_values_0.unsqueeze(2) * ray_dirs_1.unsqueeze(1)
-        # points_2 = rays_o.unsqueeze(1) + z_values_0.unsqueeze(2) * ray_dirs_2.unsqueeze(1)
-        # points_3 = rays_o.unsqueeze(1) + z_values_0.unsqueeze(2) * ray_dirs_3.unsqueeze(1)
-        # print('points_1', round(points_1.min().item(),2),round(points_1.max().item(),2))
-        # print('points_2', round(points_2.min().item(),2),round(points_2.max().item(),2))
-        # print('points_3', round(points_3.min().item(),2),round(points_3.max().item(),2))
 
-        # search
-        dists_0, indices_0, neighbors_0, radius_0 = self.search(ray_particles_0, physical_particles, self.fix_radius)
-        # embedding attributes
-        pos_like_feats_0, dirs_like_feats_0, num_nn_0 = self.embedding_local_geometry(dists_0, indices_0, neighbors_0, radius_0, ray_particles_0, rays, ro)
-        pos_input_feats_0 = torch.cat(pos_like_feats_0, dim=1)
-        dir_input_feats_0 = torch.cat(dirs_like_feats_0, dim=1)
-        
         # predict rgbsigma
-        sdf, feature_vectors, gradients = self.implicit_network.get_outputs(pos_input_feats_0, iseval = iseval)
-        print('sdf', round(sdf.min().item(),2),round(sdf.max().item(),2))
-        # self.plot_sdf(ray_particles_0_plain.detach().numpy(), sdf.cpu().numpy())
-        
-        rgb_flat = self.rendering_network(pos_input_feats_0, gradients, dir_input_feats_0, feature_vectors)
+        sdf, feature_vectors, gradients, dists_0, num_nn_0 = self.implicit_network.get_outputs(ray_particles_0, physical_particles, iseval = iseval)
+        print(sdf.min().item(),sdf.max().item())
+        gradients_flat = gradients.reshape(-1, 3)
+
+        rgb_flat = self.rendering_network(ray_particles_0, gradients_flat, dirs, feature_vectors, physical_particles, rays, ro)
         mask_0 = torch.all(dists_0!=0, dim=-1, keepdim=True).float()
         if self.cfg.use_mask:
             rgbs = rgb_flat.view(-1, z_values_0.shape[1], 3)*mask_0
         else:
             rgbs = rgb_flat.view(-1, z_values_0.shape[1], 3)
-        
         # render
-        # rgb_final_0, depth_final_0, weights_0 = self.render_image(rgbs, z_values_0, rays, noise_std, white_background, sdf)
-        weights_0 = self.volume_rendering(rgbs, z_values_0, white_background, sdf)
-        rgb_final_0 = torch.sum(weights_0.unsqueeze(-1) * rgbs, 1)
-        depth_final_0 = torch.sum(weights_0*z_values_0, -1)
-        
-        # white background assumption
-        if white_background:
-            acc_map = torch.sum(weights_0, -1)
-            rgb_final_0 = rgb_final_0 + (1. - acc_map[..., None]) * self.bg_color.unsqueeze(0)
-        
+        rgb_final_0, depth_final_0, weights_0 = self.render_image(rgbs, z_values_0, rays, noise_std, white_background, sdf)
+        # rgb_final_0, depth_final_0, weights_0 = self.volume_rendering(rgbs, z_values_0, white_background, sdf)
         if self.training:
             # results['grad_theta_eik'], results['grad_theta_nei'] = self.eikonal_loss(num_pixels, rays_o, rays_d, z_samples_eik_0, physical_particles, ro, rays)
             results['grad_theta'] = self.eikonal_loss(num_pixels, rays_o, rays_d, z_samples_eik_0, physical_particles, ro, rays)
-        
         if not self.training:
             gradients = gradients.detach()
-
         results['rgb0'] = rgb_final_0
         results['depth0'] = depth_final_0
         results['opacity0'] = weights_0.sum(1)
@@ -486,7 +459,13 @@ class RenderNet(nn.Module):
         alpha = 1 - torch.exp(-free_energy)  # probability of it is not empty here
         transmittance = torch.exp(-torch.cumsum(shifted_free_energy, dim=-1))  # probability of everything is empty up to now
         weights = alpha * transmittance # probability of the ray hits something here
-        return weights
+        rgbs = rgbsigma[..., :3]
+        rgb_final = torch.sum(weights.unsqueeze(-1) * rgbs, 1)
+        depth_final = torch.sum(weights*z_vals, -1)
+        if white_background:
+            weights_sum = weights.sum(1)
+            rgb_final = rgb_final + 1-weights_sum.unsqueeze(-1)
+        return rgb_final, depth_final, weights
         
     def eikonal_loss(self, num_pixels, cam_loc, ray_dirs, z_samples_eik, physical_particles, ro, rays):
         # Sample points for the eikonal loss
@@ -501,9 +480,11 @@ class RenderNet(nn.Module):
         neighbour_points = eikonal_points + (torch.rand_like(eikonal_points) - 0.5) * 0.01   
         eikonal_points = torch.cat([eikonal_points, neighbour_points], 0)
 
-        eikonal_points = eikonal_points.reshape(eik_near_points.shape[0], eikonal_points.shape[0]//eik_near_points.shape[0], eikonal_points.shape[1])
-        dists, indices, neighbors, radius = self.search(eikonal_points, physical_particles, self.fix_radius)
-        eikonal_pos_like_feats, _, _ = self.embedding_local_geometry(dists, indices, neighbors, radius, eikonal_points, rays, ro)
-        eikonal_pos_like_feats = torch.cat(eikonal_pos_like_feats, dim=1)
-        grad_theta = self.implicit_network.gradient(eikonal_pos_like_feats)
+        # eikonal_points = eikonal_points.reshape(eik_near_points.shape[0], eikonal_points.shape[0]//eik_near_points.shape[0], eikonal_points.shape[1])
+        # dists, indices, neighbors, radius = self.search(eikonal_points, physical_particles, self.fix_radius)
+        # eikonal_pos_like_feats, _, _ = self.embedding_local_geometry(dists, indices, neighbors, radius, eikonal_points, rays, ro)
+        # eikonal_pos_like_feats = torch.cat(eikonal_pos_like_feats, dim=1)
+        # grad_theta = self.implicit_network.gradient(eikonal_pos_like_feats, physical_particles)
+        eikonal_points = eikonal_points.unsqueeze(1)
+        grad_theta = self.implicit_network.gradient(eikonal_points, physical_particles)
         return grad_theta

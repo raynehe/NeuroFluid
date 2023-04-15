@@ -130,11 +130,11 @@ def main():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--input_glob",
                         type=str,
-                        required=True,
+                        default="'trygenerate/sim_0001/output/fluid*.npz'",
                         help="The input glob, e.g. 'mydata/fluid*.npz'")
     parser.add_argument("--outdir",
                         type=str,
-                        required=True,
+                        default="trygenerate/sim_0001/mesh/",
                         help="The output dir for the surface mesh ply files")
     parser.add_argument("--outfileprefix",
                         type=str,
@@ -162,6 +162,10 @@ def main():
     args = parser.parse_args()
 
     input_files = sorted(glob(args.input_glob))
+    # input_files_folder = 'trygenerate/sim_0001/output'
+    # input_files =  os.listdir(input_files_folder)
+    # for i in range(len(input_files)):
+    #     input_files[i] = os.path.join(input_files_folder, input_files[i])
 
     for input_file in input_files:
         if not os.path.isfile(input_file):

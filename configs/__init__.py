@@ -9,7 +9,7 @@ from yacs.config import CfgNode as CN
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--expdir', type=str, default='exps', help='experiment dir')
-parser.add_argument('--expname', type=str, default='debug', help='experiment name')
+parser.add_argument('--expname', type=str, default='eval', help='experiment name')
 parser.add_argument('--dataset', type=str, default='', help='dataset')
 parser.add_argument('--config', type=str, default='', help='default config file')
 parser.add_argument('--resume_from', type=str, default='', help='path of ckpt to be load')
@@ -82,7 +82,7 @@ def end2end_training_config() -> CN:
     cfg.update(cfg_argparse)
     cfg.freeze()
 
-    os.makedirs(os.path.join(cfg_argparse['expdir'], cfg_argparse['expname']))
+    os.makedirs(os.path.join(cfg_argparse['expdir'], cfg_argparse['expname']), exist_ok=True)
     _savepath = os.path.join(cfg_argparse['expdir'], cfg_argparse['expname'], 'config.yaml')
     save_config(cfg, _savepath)
 
@@ -128,7 +128,7 @@ def warmup_training_config() -> CN:
     cfg.freeze()
     # print(cfg.dump())
 
-    os.makedirs(os.path.join(cfg_argparse['expdir'], cfg_argparse['expname']))
+    os.makedirs(os.path.join(cfg_argparse['expdir'], cfg_argparse['expname']), exist_ok=True)
     _savepath = os.path.join(cfg_argparse['expdir'], cfg_argparse['expname'], 'config.yaml')
     save_config(cfg, _savepath)
 
@@ -152,7 +152,7 @@ def transmodel_config() -> CN:
     cfg.freeze()
     # print(cfg.dump())
 
-    os.makedirs(os.path.join(cfg_argparse['expdir'], cfg_argparse['expname']))
+    os.makedirs(os.path.join(cfg_argparse['expdir'], cfg_argparse['expname']), exist_ok=True)
     _savepath = os.path.join(cfg_argparse['expdir'], cfg_argparse['expname'], 'config.yaml')
     save_config(cfg, _savepath)
 

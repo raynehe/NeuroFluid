@@ -32,7 +32,7 @@ class Evaluator(BaseTrainer):
 
     def build_dataloader(self):
         self.test_viewnames = self.options['test'].views
-        self.test_dataset = BlenderDataset(self.options.test.path, self.options, 
+        self.test_dataset = BlenderDataset(self.options.test.rootdir, self.options.test.datadir, self.options.test.dataname, self.options,
                                             start_index=self.options['test'].start_index, end_index=self.options['test'].end_index,
                                             imgW=self.options.TEST.imgW, imgH=self.options.TEST.imgH,
                                             imgscale=self.options.TEST.scale,viewnames=self.test_viewnames, split='test')
@@ -89,10 +89,10 @@ class Evaluator(BaseTrainer):
                 if not osp.exists(osp.join(self.particlepath, 'Pred')):
                     os.makedirs(osp.join(self.particlepath, 'Pred'))
                     os.makedirs(osp.join(self.particlepath, 'GT'))
-                particle_name = osp.join(self.particlepath, f'Pred/{data_idx+1}.obj')
+                particle_name = osp.join(self.particlepath, f'Pred/pred{data_idx+1}.obj')
                 with open(particle_name, 'w') as fp:
                     record2obj(pred_pos, fp, color=[255, 0, 0]) # red
-                particle_name = osp.join(self.particlepath, f'GT/{data_idx+1}.obj')
+                particle_name = osp.join(self.particlepath, f'GT/gt{data_idx+1}.obj')
                 with open(particle_name, 'w') as fp:
                     record2obj(pos_t1, fp, color=[3, 168, 158])
                     
@@ -138,7 +138,7 @@ class Evaluator(BaseTrainer):
         pred_image = self.vis_rgbs(pred_rgbs)
         gt_image = self.vis_rgbs(gt_rgbs)
         
-        if not os.path.exists(osp.join(self.imgpath, prefix)):
+        if not os.path.exists(osp.join(self.imgpath, prefix, 'GT')):
             os.makedirs(osp.join(self.imgpath, prefix, 'GT'))
             os.makedirs(osp.join(self.imgpath, prefix, 'Pred'))
         

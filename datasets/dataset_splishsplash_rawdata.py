@@ -62,7 +62,7 @@ class ParticleDataset(Dataset):
     
     def collect_particles_blender(self):
         samples = []
-        particle_paths_i = glob.glob(osp.join(self.root_dir, 'view_0/train/particles/*.npz'))
+        particle_paths_i = glob.glob(osp.join(self.root_dir, 'view_5/train/particles/*.npz'))
         particle_paths_i.sort(key=lambda x:int(x.split('/')[-1][:-4]))
         particle_paths_i = particle_paths_i[self.start:self.end]
         box_path = osp.join(self.root_dir, 'box.pt')

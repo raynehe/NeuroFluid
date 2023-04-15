@@ -9,14 +9,20 @@ watercube:
   train:
     start_index: 0
     end_index: 50
-    path: /home/rayne/datasets/fluid_simulation/data_release/watercube
+    # path: /home/rayne/datasets/fluid_simulation/data_release/watercube
+    rootdir: /home/rayne/datasets/fluid_simulation/data_release
+    datadir: /home/rayne/datasets/fluid_simulation/data_release
+    dataname: [watercube]
     views:
-      warmup: [view_1,view_2,view_3,view_4]
+      warmup: [view_1]
       dynamic: [view_1]
   test:
     start_index: 0
     end_index: 60
-    path: /home/rayne/datasets/fluid_simulation/data_release/watercube
+    # path: /home/rayne/datasets/fluid_simulation/data_release/watercube
+    rootdir: /home/rayne/datasets/fluid_simulation/data_release
+    datadir: /home/rayne/datasets/fluid_simulation/data_release
+    dataname: [watercube]
     views: [view_5]
 
 watersphere:
@@ -59,4 +65,56 @@ honeycone:
     start_index: 0
     end_index: 60
     path: /home/rayne/datasets/fluid_simulation/data_release/honeycone
+    views: [view_5]
+
+multiscene:
+  data_type: splishsplash
+  near: 9.0
+  far: 13.0
+  gravity:
+    - 0.
+    - 0.
+    - -9.81 
+  train:
+    start_index: 0
+    end_index: 60
+    rootdir: /home/rayne/datasets/fluid_simulation/data_release
+    datadir: /home/rayne/datasets/fluid_simulation/data/multi_scene_full
+    dataname: [sim_0001, sim_0002, sim_0003, sim_0005, sim_0006, sim_0007, sim_0008, sim_0009, sim_0010]
+    views:
+      warmup: [view_0,view_1,view_2,view_3,view_4,view_5,view_6,view_7,view_8,view_9,view_10,view_11,view_12,view_13,view_14,view_15,view_16,view_17,view_18,view_19,view_20,view_21,view_22,view_23,view_24,view_25,view_26,view_27,view_28,view_29]
+      dynamic: [view_0,view_1,view_2,view_3,view_4,view_5,view_6,view_7,view_8,view_9,view_10,view_11,view_12,view_13,view_14,view_15,view_16,view_17,view_18,view_19,view_20,view_21,view_22,view_23,view_24,view_25,view_26,view_27,view_28,view_29]
+  test:
+    start_index: 0
+    end_index: 60
+    rootdir: /home/rayne/datasets/fluid_simulation/data_release
+    datadir: /home/rayne/datasets/fluid_simulation/data_release
+    dataname: [watercube]
+    views: [view_5]
+  
+scan5:
+  data_type: splishsplash
+  near: 9.0
+  far: 13.0
+  gravity:
+    - 0.
+    - 0.
+    - -9.81 
+  train:
+    start_index: 0
+    end_index: 2
+    # path: /home/rayne/datasets/fluid_simulation/data_release/watercube
+    rootdir: /home/rayne/datasets/fluid_simulation/data_release
+    datadir: /home/rayne/datasets/fluid_simulation/data_release
+    dataname: [watercube]
+    views:
+      warmup: [view_1]
+      dynamic: [view_1]
+  test:
+    start_index: 0
+    end_index: 2
+    # path: /home/rayne/datasets/fluid_simulation/data_release/watercube
+    rootdir: /home/rayne/datasets/fluid_simulation/data_release
+    datadir: /home/rayne/datasets/fluid_simulation/data_release
+    dataname: [watercube]
     views: [view_5]

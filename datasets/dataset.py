@@ -11,6 +11,8 @@ import joblib
 import numpy as np
 import os.path as osp
 from PIL import Image
+import cv2
+from utils import rend_util
 
 import torch
 from torch.utils.data import Dataset
@@ -19,7 +21,7 @@ import torchvision.transforms as T
 from utils.ray_utils import get_ray_directions, get_rays
 
 class BlenderDataset(Dataset):
-    def __init__(self, root_dir, cfg, imgW, imgH, start_index, end_index, imgscale, viewnames, split='train'):
+    def __init__(self, root_dir, data_dir, data_names, cfg, imgW, imgH, start_index, end_index, imgscale, viewnames, split='train'):
         super(BlenderDataset, self).__init__()
         self.data_type = cfg.data_type
         # self.half_res = cfg.half_res
@@ -32,6 +34,8 @@ class BlenderDataset(Dataset):
         self.img_scale = imgscale
         assert self.img_wh[0] == self.img_wh[1], 'image width should be equal to image height'
         self.root_dir = root_dir #cfg.data_path
+        self.data_dir = data_dir
+        self.data_names = data_names #cfg.data_path
         self.transforms = T.ToTensor()
         # self.view_num = len(self.viewnames)
         self.read_metas(self.viewnames)
@@ -41,23 +45,78 @@ class BlenderDataset(Dataset):
     def read_metas(self, viewnames):
         self.all_rays_mv, self.all_rgbs_mv, self.all_cw_mv, self.focal_mv, self.particles_poss_mv, self.particles_vels_mv = [], [], [], [], [], []
         for iii, viewname in enumerate(viewnames):
-            _root_dir = osp.join(self.root_dir, viewname)
-            all_rays_i, all_rgbs_i, all_cw_i, focal_i, particles_poss_i, particles_vels_i = self._read_meta(_root_dir)
-            self.all_rays_mv.append(all_rays_i)
-            self.all_rgbs_mv.append(all_rgbs_i)
-            self.all_cw_mv.append(all_cw_i)
-            self.focal_mv.append(focal_i)
+            for data_name in self.data_names:
+                _root_dir = osp.join(self.data_dir, data_name, viewname) # sim_003/view_15  sim_003/view_16
+                all_rays_i, all_rgbs_i, all_cw_i, focal_i, particles_poss_i, particles_vels_i = self._read_meta(_root_dir)
+                self.all_rays_mv.append(all_rays_i)
+                self.all_rgbs_mv.append(all_rgbs_i)
+                self.all_cw_mv.append(all_cw_i)
+                self.focal_mv.append(focal_i)
             if iii == 0:
                 self.particles_poss_mv.append(np.stack(particles_poss_i, 0))
                 self.particles_vels_mv.append(np.stack(particles_vels_i, 0))
+            print("iii",iii)
         self.all_rays_mv = np.stack(self.all_rays_mv, 0)
         self.all_rgbs_mv = np.stack(self.all_rgbs_mv, 0)
         self.all_cw_mv = np.stack(self.all_cw_mv, 0)
         # self.focal_mv = np.array(self.focal_mv)
         self.particles_poss_mv = np.stack(self.particles_poss_mv, 0)
+        # (1, 50, 11532, 3)
         self.particles_vels_mv = np.stack(self.particles_vels_mv, 0)
         # import ipdb;ipdb.set_trace()
         
+    def get_center_point(self, pose):
+        # pose:4*4
+        A = np.zeros((3, 4))
+        b = np.zeros((3, 1))
+        camera_centers=np.zeros((3, 1))
+
+        P0 = pose[:3, :]
+
+        K = cv2.decomposeProjectionMatrix(P0)[0]
+        R = cv2.decomposeProjectionMatrix(P0)[1]
+        c = cv2.decomposeProjectionMatrix(P0)[2]
+        c = c / c[3]
+        camera_centers[:,0]=c[:3].flatten()
+
+        v = np.linalg.inv(K) @ np.array([800, 600, 1])
+        v = v / np.linalg.norm(v)
+
+        v=R[2,:]
+        A[0:3, :3] = np.eye(3)
+        A[0:3,3] = -v
+        b[0:3] = c[:3]
+
+        soll= np.linalg.pinv(A) @ b
+
+        return soll,camera_centers
+
+    def normalize_cameras(self, pose):
+        # pose:4*4
+        soll, camera_centers = self.get_center_point(pose)
+
+        center = soll[:3].flatten()
+
+        max_radius = np.linalg.norm((center[:, np.newaxis] - camera_centers), axis=0).max() * 1.1
+
+        normalization = np.eye(4).astype(np.float32)
+
+        normalization[0, 3] = center[0]
+        normalization[1, 3] = center[1]
+        normalization[2, 3] = center[2]
+
+        normalization[0, 0] = max_radius / 3.0
+        normalization[1, 1] = max_radius / 3.0
+        normalization[2, 2] = max_radius / 3.0
+
+        scale_mat = normalization.astype(np.float32)
+        world_mat = pose.astype(np.float32)
+
+        P = world_mat @ scale_mat
+        P = P[:3, :4]
+        _, pose = rend_util.load_K_Rt_from_P(None, P)
+        return torch.from_numpy(pose).float()
+
 
     def _read_meta(self, root_dir):
         """
@@ -84,6 +143,10 @@ class BlenderDataset(Dataset):
         particle_poss = []
         particle_vels = []
         # self.all_mask = []
+        # select_frame_idx = [_ for _ in range (self.start_index, self.end_index, 4)]
+        # for idx in select_frame_idx:
+        #     frame = self.meta['frames'][idx]
+        idx = 0
         for frame in self.meta['frames'][self.start_index:self.end_index]:
             # get particles
             # particles_path.append(frame['particle_path'])
@@ -93,7 +156,11 @@ class BlenderDataset(Dataset):
                 particle_vels.append(particle_vel)
             # get orignal point and directrion
             pose = np.array(frame['transform_matrix'])[:3, :4]
+            # pose = np.array(frame['transform_matrix'])
+            # pose = self.normalize_cameras(pose)
+            # pose = pose[:3, :4]
             poses.append(pose)
+            print(np.linalg.det(pose[:3, :3]))
             c2w = torch.FloatTensor(pose)
             all_cw.append(pose)
             rays_o, rays_d = get_rays(directions, c2w)
@@ -111,6 +178,9 @@ class BlenderDataset(Dataset):
             # image = image.view(4, -1).permute(1,0) #(H*W, 4), RGBA image
             # image = image[:, :3]*image[:, -1:] + (1-image[:, -1:]) # blend A to RGB, assume white background. 
             all_rgbs.append(image)
+            if not idx == 0:
+                break
+            idx += 1
         all_rays = np.stack(all_rays, 0)
         all_rgbs = np.stack(all_rgbs, 0)
         all_cw = np.stack(all_cw, 0)

@@ -41,12 +41,12 @@ class Trainer(BaseTrainer):
     def build_dataloader(self):
         self.train_view_names = self.options['train'].views.dynamic
         self.test_viewnames = self.options['test'].views
-        self.dataset = BlenderDataset(self.options.train.path, self.options,
+        self.dataset = BlenderDataset(self.options.train.rootdir, self.options.train.datadir, self.options.train.dataname, self.options,
                                             start_index=self.options['train'].start_index, end_index=self.options['train'].end_index,
                                             imgW=self.options.TRAIN.imgW, imgH=self.options.TRAIN.imgH,
                                             imgscale=self.options.TRAIN.scale, viewnames=self.train_view_names, split='train')
         self.dataset_length = len(self.dataset)
-        self.test_dataset = BlenderDataset(self.options.test.path, self.options, 
+        self.test_dataset = BlenderDataset(self.options.test.rootdir, self.options.test.datadir, self.options.test.dataname, self.options,
                                             start_index=self.options['test'].start_index, end_index=self.options['test'].end_index,
                                             imgW=self.options.TEST.imgW, imgH=self.options.TEST.imgH,
                                             imgscale=self.options.TEST.scale, viewnames=self.test_viewnames, split='test')
@@ -162,6 +162,8 @@ class Trainer(BaseTrainer):
         # prepare training
         global_step = self.start_step
         view_num = len(self.train_view_names)
+        # seg_num = 1
+        # view_num_batches = [ [_ for _ in range(i,i+seg_num)] for i in range(0, view_num, seg_num) ]
         imgW, imgH = self.options.TRAIN.imgW, self.options.TRAIN.imgH
         img_scale = self.options.TRAIN.scale
         H = int(imgH // img_scale)
@@ -177,6 +179,7 @@ class Trainer(BaseTrainer):
                 data = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v for k,v in data.items()}
                 # training
                 loss = self.train_step(data, data_idx, view_num, H, W, global_step)
+                # loss = self.train_step(data, data_idx, view_num_batches[epoch_idx%(view_num//seg_num)], H, W, global_step)
                 self.update_step(loss, global_step)
                 global_step += 1
                         
@@ -198,7 +201,11 @@ class Trainer(BaseTrainer):
         self.vel_for_next_step.requires_grad = False
         return pred_pos
     
+    def get_eikonal_loss(self, grad_theta):
+        eikonal_loss = ((grad_theta.norm(2, dim=1) - 1) ** 2).mean().to(self.device)
+        return eikonal_loss
         
+    # def train_step(self, data, data_idx, view_num_batch, H, W, global_step):
     def train_step(self, data, data_idx, view_num, H, W, global_step):
         # -----
         # particle transition
@@ -216,6 +223,7 @@ class Trainer(BaseTrainer):
         ray_chunk = self.options.RENDERER.ray.ray_chunk
         N_importance = self.options.RENDERER.ray.N_importance
         total_loss = 0.
+        # for view_idx in (view_num_batch):
         for view_idx in range(view_num):
             # -------
             # render by a nerf model, and then calculate mse loss
@@ -242,13 +250,25 @@ class Trainer(BaseTrainer):
             else:
                 rgbloss = rgbloss_0
             total_loss = total_loss+rgbloss
+            # calculate eikonal loss
+            if 'grad_theta' in render_ret:
+                eikonal_loss = self.get_eikonal_loss(render_ret['grad_theta'])
+                total_loss = total_loss+self.options.TRAIN.eikonal_weight*eikonal_loss
                     
             # log
             if (global_step+1) % self.log_interval == 0:
                 self.summary_writer.add_scalar(f'{view_name}/rgbloss_0', rgbloss_0.item(), global_step)
-                self.summary_writer.add_scalar(f'{view_name}/rgbloss', rgbloss.item(), global_step)
+                # self.summary_writer.add_scalar(f'{view_name}/rgbloss', rgbloss.item(), global_step)
                 self.summary_writer.add_histogram(f'{view_name}/num_neighbors_0', render_ret['num_nn_0'], global_step)
+                self.summary_writer.add_scalar(f'{view_name}/eikonal_loss', eikonal_loss.item(), global_step)
+                self.summary_writer.add_scalar(f'{view_name}/total_loss', total_loss.item(), global_step)
+                coarse_sample_points = render_ret['coarse_sample_points']
+                if not os.path.exists(self.imgpath + '/samples'):
+                    os.makedirs(self.imgpath + '/samples')
+                self.vis_sample_points(pred_pos.detach().cpu().numpy(), coarse_sample_points, global_step, prefix=f'samples/{view_name}_coarse')
                 if N_importance>0:
+                    fine_sample_points = render_ret['fine_sample_points']
+                    self.vis_sample_points(pred_pos.detach().cpu().numpy(), fine_sample_points, global_step, prefix=f'samples/{view_name}_fine')
                     self.summary_writer.add_scalar(f'{view_name}/rgbloss_1', rgbloss_1.item(), global_step)
                     self.summary_writer.add_histogram(f'{view_name}/num_neighbors_1', render_ret['num_nn_1'], global_step)
         
@@ -279,6 +299,16 @@ class Trainer(BaseTrainer):
             torch.nn.utils.clip_grad_norm_(self.renderer.parameters(), grad_clip_value)
             torch.nn.utils.clip_grad_norm_(self.transition_model.parameters(), grad_clip_value)
         self.optimizer.step()
+        # for name, parms in self.transition_model.named_parameters():
+        #     # if name in names:	
+        #         print('-->name:', name)
+        #         # print('-->para:', parms)
+        #         print('-->grad_requirs:',parms.requires_grad)
+        #         # print('-->grad_value:',parms.grad)
+        #         # print('-->is_leaf:',parms.is_leaf)
+        #         # print('grad-norm:',  torch.norm(parms.grad))
+        #         print("===")
+        # print('==================')
         if seperate_render_transition:
             self.transition_optimizer.step()
         if self.options.TRAIN.LR.use_scheduler:
@@ -300,7 +330,12 @@ class Trainer(BaseTrainer):
             render_grad = self.cal_grad_norm(self.renderer)
             self.summary_writer.add_histogram('trans_grad/trans_grad_after', trans_grad, global_step)
             self.summary_writer.add_histogram('render_grad/render_grad_after', render_grad, global_step)
+        print('learning rate:', self.optimizer.param_groups[0]['lr'])
+        print('loss:', loss.item())
 
+    def get_eikonal_loss(self, grad_theta):
+        eikonal_loss = ((grad_theta.norm(2, dim=1) - 1) ** 2).mean().to(self.device)
+        return eikonal_loss
 
     def eval(self, step_idx):
         """
