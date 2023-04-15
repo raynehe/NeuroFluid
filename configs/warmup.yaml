@@ -2,17 +2,18 @@ TRAIN:
   pretained_renderer: ''
   seed: 10
   partial_load: False
-  N_iters: 100000
+  N_iters: 50010
   precrop_iters: 500
   eikonal_weight: 0.2
   LR:
-    lr: 5.0e-4
+    lr: 1.0e-4
     use_scheduler: True
     decay_epochs: 10000
   imgW: 400
   imgH: 400
   scale: 1.0
-  save_interval: 500
+  # save_interval: 500
+  save_interval: 300 # for testing
   log_interval: 10
   # save_interval: 10 # for debugging
   # log_interval: 5

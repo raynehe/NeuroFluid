@@ -282,6 +282,7 @@ class BaseTrainer():
             rendered results 
         """
         pred_rgbs_0, pred_rgbs_1 = [], []
+        grad_theta = []
         num_nn_0, num_nn_1 = [], []
         mask_0, mask_1 = [], []
         grad_theta = []

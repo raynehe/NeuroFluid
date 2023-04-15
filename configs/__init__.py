@@ -13,6 +13,15 @@ parser.add_argument('--expname', type=str, default='eval', help='experiment name
 parser.add_argument('--dataset', type=str, default='', help='dataset')
 parser.add_argument('--config', type=str, default='', help='default config file')
 parser.add_argument('--resume_from', type=str, default='', help='path of ckpt to be load')
+# volsdf
+# parser.add_argument('--batch_size', type=int, default=1, help='input batch size')
+# parser.add_argument('--nepoch', type=int, default=2000, help='number of epochs to train for')
+# parser.add_argument('--is_continue', default=False, action="store_true",
+#                     help='If set, indicates continuing from a previous run.')
+# parser.add_argument('--timestamp', default='latest', type=str,
+#                     help='The timestamp of the run to be used in case of continuing from a previous run.')
+# parser.add_argument('--checkpoint', default='latest', type=str,
+#                     help='The checkpoint epoch of the run to be used in case of continuing from a previous run.')
 
 _C = CN(new_allowed=True)
 

@@ -49,6 +49,9 @@ class Evaluator(BaseTrainer):
     
     def resume(self, ckpt_file):
         # resume
+        # self.modelname = osp.basename(ckpt_file).split('/')[-1][:-3]
+        # self.particlepath = osp.join(self.exppath, self.modelname, 'particles')
+        # self.imgpath = osp.join(self.exppath, self.modelname, 'images')
         checkpoint = torch.load(ckpt_file)
         self.renderer.load_state_dict(checkpoint['renderer_state_dict'], strict=True)
         self.transition_model.load_state_dict(checkpoint['transition_model_state_dict'], strict=True)
@@ -144,11 +147,11 @@ class Evaluator(BaseTrainer):
         
         # save res
         gt_rgb8 = to8b(gt_image.permute(1,2,0).detach().numpy())
-        filename = '{}/{}/GT/{:05d}.png'.format(self.imgpath, prefix, data_idx)
+        filename = '{}/GT/{:05d}.png'.format(self.imgpath, data_idx)
         imageio.imwrite(filename, gt_rgb8)
         
         pred_rgb8 = to8b(pred_image.permute(1,2,0).detach().numpy())
-        filename = '{}/{}/Pred/{:05d}.png'.format(self.imgpath, prefix, data_idx)
+        filename = '{}/Pred/{:05d}.png'.format(self.imgpath, data_idx)
         imageio.imwrite(filename, pred_rgb8)
         
 

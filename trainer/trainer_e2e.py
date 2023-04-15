@@ -271,6 +271,7 @@ class Trainer(BaseTrainer):
                     self.vis_sample_points(pred_pos.detach().cpu().numpy(), fine_sample_points, global_step, prefix=f'samples/{view_name}_fine')
                     self.summary_writer.add_scalar(f'{view_name}/rgbloss_1', rgbloss_1.item(), global_step)
                     self.summary_writer.add_histogram(f'{view_name}/num_neighbors_1', render_ret['num_nn_1'], global_step)
+            # torch.cuda.empty_cache()
         
         if self.options.TRAIN.loss_weight['boundary_loss'] != 0.:
             bd_loss = self.cal_boundary_loss(pred_pos)
